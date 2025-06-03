@@ -11,7 +11,6 @@ Dependencies:
     => Client: `pip install requests json-numpy`
 
 Client (Standalone) Usage (assuming a server running on 0.0.0.0:8000):
-
 ```
 import requests
 import json_numpy

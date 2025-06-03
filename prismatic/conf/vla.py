@@ -72,15 +72,15 @@ class Exp_SigLIP_224px_Bridge(VLAConfig):
 
     # Data Mixture Parameters
     data_mix: str = "bridge"
-    shuffle_buffer_size: int = 256_000
+    shuffle_buffer_size: int = 100 # 32_000
 
     # Optimization Parameters
     epochs: int = 1000
-    max_steps: Optional[int] = None
+    max_steps: Optional[int] = 200
 
     expected_world_size: int = 8
-    global_batch_size: int = 256
-    per_device_batch_size: int = 32
+    global_batch_size: int = 128
+    per_device_batch_size: int = 16
 
     learning_rate: float = 2e-5
     weight_decay: float = 0.0

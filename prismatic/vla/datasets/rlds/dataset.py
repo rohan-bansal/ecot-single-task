@@ -38,6 +38,11 @@ overwatch = initialize_overwatch(__name__)
 # Configure Tensorflow with *no GPU devices* (to prevent clobber with PyTorch)
 tf.config.set_visible_devices([], "GPU")
 
+def single_task_filter(x):
+    # Use regex to match the full instruction (allows for minor variations)
+    matches = tf.strings.regex_full_match(x["task"]["language_instruction"], b"move the brown toy to the lower right burner")
+    # Remove the tf.print to stop the spam during training
+    return tf.reduce_any(matches)
 
 # ruff: noqa: B006
 def make_dataset_from_rlds(
@@ -57,7 +62,7 @@ def make_dataset_from_rlds(
     action_normalization_mask: Optional[List[bool]] = None,
     num_parallel_reads: int = tf.data.AUTOTUNE,
     num_parallel_calls: int = tf.data.AUTOTUNE,
-    reasoning_dataset_path: str = "~/.cache/reasonings_dataset.json",
+    reasoning_dataset_path: str = "/srv/rl2-lab/flash7/rbansal66/.cache/huggingface/hub/datasets--Embodied-CoT--embodied_features_bridge/snapshots/854ee59c7c76868d63fac37c33e0f031ed678014/embodied_features_bridge.json",
 ) -> Tuple[dl.DLataset, dict]:
     """
     This function is responsible for loading a specific RLDS dataset from storage and getting it into a standardized
@@ -117,6 +122,8 @@ def make_dataset_from_rlds(
             it's always exactly 0 or 1. By default, all action dimensions are normalized.
         num_parallel_reads (int): number of parallel read workers. Default to AUTOTUNE.
         num_parallel_calls (int): number of parallel calls for traj_map operations. Default to AUTOTUNE.
+        reasoning_dataset_path (str, optional): Path to the reasoning dataset JSON file.
+        task_filter (Callable[[dict], bool], optional): Filter function to apply to the dataset.
     Returns:
         Dataset of trajectories where each step has the following fields:
         - observation:
@@ -290,6 +297,7 @@ def make_dataset_from_rlds(
 
         return traj
 
+    # print("builder name:", name)
     builder = tfds.builder(name, data_dir=data_dir)
 
     # load or compute dataset statistics
@@ -329,7 +337,20 @@ def make_dataset_from_rlds(
 
     dataset = dl.DLataset.from_rlds(builder, split=split, shuffle=shuffle, num_parallel_reads=num_parallel_reads)
 
+    # Apply restructure first
     dataset = dataset.traj_map(restructure, num_parallel_calls)
+    
+    # Apply the task filter EARLY, right after restructuring but before normalization
+    # This filters the dataset once at creation time, not during training
+    print("Applying single task filter...")
+    dataset = dataset.filter(single_task_filter)
+    
+    # Count filtered trajectories for debugging
+    # print("Counting filtered trajectories...")
+    # filtered_count = dataset.reduce(0, lambda x, _: x + 1).numpy()
+    # print(f"Filtered dataset contains {filtered_count} trajectories")
+    
+    # Apply normalization after filtering
     dataset = dataset.traj_map(
         partial(
             normalize_action_and_proprio,
@@ -338,7 +359,7 @@ def make_dataset_from_rlds(
         ),
         num_parallel_calls,
     )
-
+    
     return dataset, dataset_statistics
 
 
@@ -438,6 +459,7 @@ def apply_trajectory_transforms(
             partial(traj_transforms.subsample, subsample_length=subsample_length),
             num_parallel_calls,
         )
+
 
     return dataset
 
@@ -592,6 +614,7 @@ def make_interleaved_dataset(
     if (traj_transform_kwargs is None) or (frame_transform_kwargs is None):
         raise ValueError("Missing `traj_transform_kwargs` and `frame_transform_kwargs`!")
 
+    x = 0
     # Get Dataset Sizes
     dataset_sizes, all_dataset_statistics = [], {}
     for dataset_kwargs in dataset_kwargs_list:
@@ -599,6 +622,9 @@ def make_interleaved_dataset(
         if "dataset_frame_transform_kwargs" in data_kwargs:
             data_kwargs.pop("dataset_frame_transform_kwargs")
         _, dataset_statistics = make_dataset_from_rlds(**data_kwargs, train=train)
+        if x < 5:
+            print("dataset_statistics:", dataset_statistics)
+            x += 1
         dataset_sizes.append(dataset_statistics["num_transitions"])
         all_dataset_statistics[dataset_kwargs["name"]] = dataset_statistics
 
