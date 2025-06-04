@@ -417,8 +417,7 @@ class TrainingStrategy(ABC):
                 cot_accuracy = correct_cot_preds.sum().float() / cot_mask.sum().float()
 
                 # === Online Evaluation: Print Predicted Reasoning Trace ===
-                # Add this section to print reasoning traces at specified intervals
-                if metrics.global_step % 100 == 0 and overwatch.is_rank_zero():  # Print every 100 steps, only on rank 0
+                if metrics.global_step % 50 == 0 and overwatch.is_rank_zero():  # Print every 50 steps, only on rank 0
                     print(f"\n=== ONLINE EVAL - Step {metrics.global_step} ===")
                     
                     # Take the first example in the batch for printing
@@ -426,8 +425,6 @@ class TrainingStrategy(ABC):
                     pred_tokens = token_preds[example_idx]
                     gt_tokens = token_gt[example_idx]
                     
-                    # Decode predicted reasoning trace
-                    # Remove padding tokens and convert to text
                     valid_pred_mask = pred_tokens != -100  # Assuming -100 is padding/ignore token
                     valid_pred_tokens = pred_tokens[valid_pred_mask]
                     
@@ -441,7 +438,6 @@ class TrainingStrategy(ABC):
                     except Exception as e:
                         print(f"Error decoding predicted tokens: {e}")
                     
-                    # Decode ground truth reasoning trace for comparison
                     valid_gt_mask = gt_tokens != -100
                     valid_gt_tokens = gt_tokens[valid_gt_mask]
                     
@@ -461,15 +457,6 @@ class TrainingStrategy(ABC):
                     if example_cot_mask.sum() > 0:
                         example_cot_accuracy = example_correct_cot.sum().float() / example_cot_mask.sum().float()
                         print(f"REASONING ACCURACY: {example_cot_accuracy:.4f}")
-                    
-                    # Print action predictions vs ground truth
-                    example_action_mask = action_mask[example_idx]
-                    if example_action_mask.sum() > 0:
-                        pred_actions = continuous_actions_pred[action_mask.sum(dim=0).cumsum(dim=0) <= example_idx + 1]
-                        gt_actions = continuous_actions_gt[action_mask.sum(dim=0).cumsum(dim=0) <= example_idx + 1]
-                        if len(pred_actions) > 0 and len(gt_actions) > 0:
-                            print(f"PREDICTED ACTIONS: {pred_actions[-1].cpu().numpy()}")
-                            print(f"GROUND TRUTH ACTIONS: {gt_actions[-1].cpu().numpy()}")
                     
                     print("=" * 50)
 
