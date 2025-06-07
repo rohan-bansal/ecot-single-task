@@ -40,7 +40,9 @@ tf.config.set_visible_devices([], "GPU")
 
 def single_task_filter(x):
     # Use regex to match the full instruction (allows for minor variations)
-    matches = tf.strings.regex_full_match(x["task"]["language_instruction"], b"move the brown toy to the lower right burner")
+    tf.print(x["task"]["language_instruction"])
+    # matches = tf.strings.regex_full_match(x["task"]["language_instruction"], b"move the brown toy to the lower right burner")
+    matches = tf.strings.regex_full_match(x["task"]["language_instruction"], b"put the chocolate pudding to the right of the plate")
     # Remove the tf.print to stop the spam during training
     return tf.reduce_any(matches)
 
@@ -62,7 +64,8 @@ def make_dataset_from_rlds(
     action_normalization_mask: Optional[List[bool]] = None,
     num_parallel_reads: int = tf.data.AUTOTUNE,
     num_parallel_calls: int = tf.data.AUTOTUNE,
-    reasoning_dataset_path: str = "/srv/rl2-lab/flash7/rbansal66/.cache/huggingface/hub/datasets--Embodied-CoT--embodied_features_bridge/snapshots/854ee59c7c76868d63fac37c33e0f031ed678014/embodied_features_bridge.json",
+    # reasoning_dataset_path: str = "/srv/rl2-lab/flash7/rbansal66/.cache/huggingface/hub/datasets--Embodied-CoT--embodied_features_bridge/snapshots/854ee59c7c76868d63fac37c33e0f031ed678014/embodied_features_bridge.json",
+    reasoning_dataset_path: str=  "/srv/rl2-lab/flash7/rbansal66/embodied-CoT/data/embodied_features_and_demos_libero/libero_reasonings.json"
 ) -> Tuple[dl.DLataset, dict]:
     """
     This function is responsible for loading a specific RLDS dataset from storage and getting it into a standardized
@@ -172,6 +175,7 @@ def make_dataset_from_rlds(
 
         for file_name in raw_dict.keys():
             for episode_id in raw_dict[file_name].keys():
+                # print(raw_dict[file_name][episode_id].keys())
                 if "reasoning" not in raw_dict[file_name][episode_id].keys():
                     has_reasoning[0] += 1
                     continue
@@ -184,6 +188,9 @@ def make_dataset_from_rlds(
 
                     gripper_lookahead_n = 5  # list this many future positions of the gripper
                     trajectory_features = raw_dict[file_name][episode_id]["features"]
+
+                    # print(trajectory_features.keys())
+                    # print(trajectory_features["gripper_position"])
 
                     reasoning_dict["gripper"] = ""
                     if "gripper_position" in trajectory_features.keys():
@@ -210,8 +217,8 @@ def make_dataset_from_rlds(
 
                     values.append(reasoning_dict_to_str(reasoning_dict))
 
-        print("Example reasoning:", keys[0], values[0])
-        print("Reasoning presence statistics [# has not, # has]:", has_reasoning)
+        # print("Example reasoning:", keys[0], values[0])
+        # print("Reasoning presence statistics [# has not, # has]:", has_reasoning)
 
         return tf.lookup.StaticHashTable(tf.lookup.KeyValueTensorInitializer(keys, values), default_value="")
 

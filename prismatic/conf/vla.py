@@ -107,6 +107,12 @@ class Exp_DinoSigLIP_224px_Bridge(Exp_SigLIP_224px_Bridge):
 
     data_mix: str = "bridge"
 
+@dataclass
+class Exp_DinoSigLIP_224px_LIBERO_90(Exp_DinoSigLIP_224px_Bridge):
+    vla_id: str = "prism-dinosiglip-224px+mx-libero-90"
+
+    data_mix: str = "libero_lm_90"
+
 
 # = [64 GPU] SigLIP 224px + OXE Magic Soup =
 @dataclass
@@ -204,6 +210,7 @@ class VLARegistry(Enum):
     # Sanity Check Configurations =>> BridgeV2
     SIGLIP_224PX_MX_BRIDGE = Exp_SigLIP_224px_Bridge
     DINOSIGLIP_224PX_MX_BRIDGE = Exp_DinoSigLIP_224px_Bridge
+    DINOSIGLIP_224PX_MX_LIBERO_90 = Exp_DinoSigLIP_224px_LIBERO_90
 
     # SigLIP Frozen Backbone Experiment
     FREEZE_SIGLIP_224PX_MX_BRIDGE = Exp_FreezeVIT_SigLIP_224px_Bridge
