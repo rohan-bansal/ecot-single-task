@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=train_ecot
-#SBATCH --output=/srv/rl2-lab/flash7/rbansal66/embodied-CoT/train_ecot.out
-#SBATCH --error=/srv/rl2-lab/flash7/rbansal66/embodied-CoT/train_ecot.err
+#SBATCH --output=/srv/rl2-lab/flash7/zhenyang/logs/ecot/train_ecot.out
+#SBATCH --error=/srv/rl2-lab/flash7/zhenyang/logs/ecot/train_ecot.err
 #SBATCH --partition=overcap
 #SBATCH --time=48:00:00
 #SBATCH --cpus-per-task=15
@@ -11,12 +11,23 @@
 #SBATCH --requeue
 
 export PYTHONUNBUFFERED=TRUE
-source ~/.bashrc
-conda deactivate
-conda activate ecot
+# source ~/.bashrc
+# conda deactivate
+source /coc/flash7/zhenyang/miniconda3/etc/profile.d/conda.sh
+conda activate openvla
 
 nvidia-smi
 
-cd /srv/rl2-lab/flash7/rbansal66/embodied-CoT
+cd /srv/rl2-lab/flash7/zhenyang/ecot-single-task
 
-srun -u torchrun --standalone --nnodes 1 --nproc-per-node 8 --master_port=25678 vla-scripts/train.py --vla.type "prism-dinosiglip-224px+mx-bridge" --data_root_dir /srv/rl2-lab/flash7/rbansal66/embodied-CoT/data --run_root_dir /srv/rl2-lab/flash7/rbansal66/embodied-CoT/runs --wandb_project ecot_reproduce --wandb_entity solace
+srun -u torchrun \
+    --standalone \
+    --nnodes 1 \
+    --nproc-per-node 8 \
+    --master_port=25678 \
+    vla-scripts/train.py \
+    --vla.type "prism-dinosiglip-224px+mx-bridge" \
+    --data_root_dir /srv/rl2-lab/flash7/rbansal66/embodied-CoT/data \
+    --run_root_dir /srv/rl2-lab/flash7/zhenyang/ecot-single-task/runs \
+    --wandb_project ecot_reproduce \
+    --wandb_entity zhenyang
