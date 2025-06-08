@@ -235,7 +235,10 @@ def make_dataset_from_rlds(
                 # First, collect all step data and sort by step index for proper lookahead
                 step_data_list = []
                 for step_idx, step_data in episode_data.items():
+                    # TODO: make this configurable
                     expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement", "bboxes", "gripper"]
+                    # expected_keys = ["bboxes", "gripper"]
+                    # expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement"]
                     if isinstance(step_data, dict) and any(key in step_data for key in expected_keys):
                         step_data_list.append((int(step_idx), step_data))
                 
@@ -381,9 +384,25 @@ def make_dataset_from_rlds(
     elif dataset_statistics is None:
         full_dataset = dl.DLataset.from_rlds(
             builder, split="all", shuffle=False, num_parallel_reads=num_parallel_reads
-        ).traj_map(restructure, num_parallel_calls)
+        )
+        
+        # Log initial dataset info
+        try:
+            initial_size = builder.info.splits['all'].num_examples
+            overwatch.info(f"Full dataset size from builder info: {initial_size} examples")
+        except Exception as e:
+            overwatch.warning(f"Could not get initial dataset size: {str(e)}")
 
         full_dataset = full_dataset.ignore_errors()
+        full_dataset = full_dataset.traj_map(restructure, num_parallel_calls)
+
+        # Add size check after traj_map
+        try:
+            count_after_map = full_dataset.reduce(0, lambda x, _: x + 1).numpy()
+            overwatch.info(f"Full dataset size after traj_map: {count_after_map}")
+        except Exception as e:
+            overwatch.warning(f"Error counting dataset after traj_map: {str(e)}")
+
         # tries to load from cache, otherwise computes on the fly
         dataset_statistics = get_dataset_statistics(
             full_dataset,
@@ -418,13 +437,12 @@ def make_dataset_from_rlds(
     
     # Apply the task filter EARLY, right after restructuring but before normalization
     # This filters the dataset once at creation time, not during training
-    print("Applying single task filter...")
     dataset = dataset.filter(single_task_filter)
-    
-    # Count filtered trajectories for debugging
-    # print("Counting filtered trajectories...")
-    # filtered_count = dataset.reduce(0, lambda x, _: x + 1).numpy()
-    # print(f"Filtered dataset contains {filtered_count} trajectories")
+
+    try:
+        overwatch.info(f"Training dataset size after single task filter: {dataset.reduce(0, lambda x, _: x + 1).numpy()}")
+    except Exception as e:
+        overwatch.warning(f"Error counting dataset after single task filter: {str(e)}")
     
     # Apply normalization after filtering
     dataset = dataset.traj_map(
