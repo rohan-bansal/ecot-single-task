@@ -239,8 +239,11 @@ def make_dataset_from_rlds(
                     expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement", "bboxes", "gripper"]
                     # expected_keys = ["bboxes", "gripper"]
                     # expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement"]
-                    if isinstance(step_data, dict) and any(key in step_data for key in expected_keys):
-                        step_data_list.append((int(step_idx), step_data))
+                    if isinstance(step_data, dict):
+                        # Create new dict with only expected keys that exist in step_data
+                        filtered_step_data = {key: step_data[key] for key in expected_keys if key in step_data}
+                        if filtered_step_data:  # Only append if we found any expected keys
+                            step_data_list.append((int(step_idx), filtered_step_data))
                 
                 # Sort by step index
                 step_data_list.sort(key=lambda x: x[0])

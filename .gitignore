@@ -27,6 +27,8 @@ share/python-wheels/
 *.egg
 MANIFEST
 .hf_token
+rollouts/
+experiments/logs/
 
 trunc_data/
 runs/
