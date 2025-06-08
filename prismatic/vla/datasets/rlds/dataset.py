@@ -167,60 +167,115 @@ def make_dataset_from_rlds(
         def reasoning_dict_to_str(d):
             tags = get_cot_tags_list()[:-1]  # exclude ACTION
             database_keys = get_cot_database_keys()
-            reasoning_parts = [(tag, d[database_keys[tag]]) for tag in tags]
+            
+            # Map your new dictionary keys to the expected database keys
+            key_mapping = {
+                "subtask_reasoning": "subtask_reason",
+                "movement_reasoning": "move_reason", 
+                "movement": "move"
+            }
+            
+            reasoning_parts = []
+            for tag in tags:
+                expected_key = database_keys[tag]
+                
+                # Use the mapped key if it exists, otherwise use the expected key
+                actual_key = key_mapping.get(expected_key, expected_key)
+                
+                if actual_key in d:
+                    value = d[actual_key]
+                    # Handle different data types
+                    if isinstance(value, dict):
+                        # Convert dict to string representation (for plan, bboxes)
+                        if actual_key == "plan":
+                            # Convert plan dict to a readable string
+                            value = "; ".join([f"Step {k}: {v}" for k, v in value.items()])
+                        elif actual_key == "bboxes":
+                            # Convert bboxes dict to string
+                            value = ", ".join([f"{name} {box}" for name, box in value.items()])
+                        else:
+                            value = str(value)
+                    elif isinstance(value, list):
+                        # Convert list to string (for gripper)
+                        value = str(value)
+                    else:
+                        value = str(value)
+                    
+                    reasoning_parts.append((tag, value))
+                else:
+                    # If key doesn't exist, use empty string
+                    reasoning_parts.append((tag, ""))
 
             return "@".join(f"{tag}@{part}" for tag, part in reasoning_parts)
 
         has_reasoning = [0, 0]
 
+        # Iterate through the step-indexed structure
         for file_name in raw_dict.keys():
             for episode_id in raw_dict[file_name].keys():
-                # print(raw_dict[file_name][episode_id].keys())
-                if "reasoning" not in raw_dict[file_name][episode_id].keys():
-                    has_reasoning[0] += 1
-                    continue
+                episode_data = raw_dict[file_name][episode_id]
+                
+                # Check if this is the old format with nested "reasoning" key
+                if "reasoning" in episode_data:
+                    # Old format - has nested reasoning dict indexed by steps
+                    has_reasoning[1] += len(episode_data["reasoning"])
+                    for step_idx in episode_data["reasoning"].keys():
+                        keys.append(file_name + "_" + str(episode_id) + "_" + step_idx)
+                        reasoning_dict = episode_data["reasoning"][step_idx]
+
+                        # Add gripper and bboxes from features if available
+                        gripper_lookahead_n = 5
+                        if "features" in episode_data:
+                            trajectory_features = episode_data["features"]
+                            
+                            reasoning_dict["gripper"] = ""
+                            if "gripper_position" in trajectory_features:
+                                if trajectory_features["gripper_position"] is not None:
+                                    if 0 <= int(step_idx) < len(trajectory_features["gripper_position"]):
+                                        future_positions = []
+                                        for j in range(gripper_lookahead_n):
+                                            if int(step_idx) + j < len(trajectory_features["gripper_position"]):
+                                                future_positions += trajectory_features["gripper_position"][int(step_idx) + j]
+                                            else:
+                                                future_positions += future_positions[-2:]
+                                        reasoning_dict["gripper"] = str(future_positions)
+
+                            reasoning_dict["bboxes"] = ""
+                            if "bboxes" in trajectory_features:
+                                if trajectory_features["bboxes"] is not None:
+                                    if 0 <= int(step_idx) < len(trajectory_features["bboxes"]):
+                                        boxes_list = trajectory_features["bboxes"][int(step_idx)]
+                                        reasoning_dict["bboxes"] = ", ".join(
+                                            [f"{name} {box!s}" for prob, name, box in boxes_list]
+                                        )
+
+                        values.append(reasoning_dict_to_str(reasoning_dict))
+                
                 else:
-                    has_reasoning[1] += 1
+                    # New format - each step is directly indexed in the episode
+                    # The episode_data itself contains step indices as keys
+                    step_count = 0
+                    for step_idx, step_data in episode_data.items():
+                        # Check if this step has reasoning data
+                        expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement", "bboxes", "gripper"]
+                        if isinstance(step_data, dict) and any(key in step_data for key in expected_keys):
+                            keys.append(file_name + "_" + str(episode_id) + "_" + str(step_idx))
+                            values.append(reasoning_dict_to_str(step_data))
+                            step_count += 1
+                    
+                    if step_count > 0:
+                        has_reasoning[1] += step_count
+                    else:
+                        has_reasoning[0] += 1
 
-                for i in raw_dict[file_name][episode_id]["reasoning"].keys():
-                    keys.append(file_name + "_" + str(episode_id) + "_" + i)
-                    reasoning_dict = raw_dict[file_name][episode_id]["reasoning"][i]
+        print("Example reasoning:", keys[0] if keys else "None", values[0] if values else "None")
+        print("Reasoning presence statistics [# has not, # has]:", has_reasoning)
 
-                    gripper_lookahead_n = 5  # list this many future positions of the gripper
-                    trajectory_features = raw_dict[file_name][episode_id]["features"]
-
-                    # print(trajectory_features.keys())
-                    # print(trajectory_features["gripper_position"])
-
-                    reasoning_dict["gripper"] = ""
-                    if "gripper_position" in trajectory_features.keys():
-                        if trajectory_features["gripper_position"] is not None:
-                            if 0 <= int(i) < len(trajectory_features["gripper_position"]):
-                                future_positions = []
-                                for j in range(gripper_lookahead_n):
-                                    if int(i) + j < len(trajectory_features["gripper_position"]):
-                                        future_positions += trajectory_features["gripper_position"][int(i) + j]
-                                    else:
-                                        future_positions += future_positions[-2:]
-
-                                reasoning_dict["gripper"] = str(future_positions)
-
-                    reasoning_dict["bboxes"] = ""
-                    if "bboxes" in trajectory_features.keys():
-                        if trajectory_features["bboxes"] is not None:
-                            if 0 <= int(i) < len(trajectory_features["bboxes"]):
-                                if len(trajectory_features["bboxes"][int(i)]) > 0:
-                                    boxes_list = trajectory_features["bboxes"][int(i)]
-                                    reasoning_dict["bboxes"] = ", ".join(
-                                        [f"{name} {box!s}" for prob, name, box in boxes_list]
-                                    )
-
-                    values.append(reasoning_dict_to_str(reasoning_dict))
-
-        # print("Example reasoning:", keys[0], values[0])
-        # print("Reasoning presence statistics [# has not, # has]:", has_reasoning)
-
-        return tf.lookup.StaticHashTable(tf.lookup.KeyValueTensorInitializer(keys, values), default_value="")
+        # Fix the TensorFlow error by ensuring default_value is a string tensor
+        return tf.lookup.StaticHashTable(
+            tf.lookup.KeyValueTensorInitializer(keys, values), 
+            default_value=tf.constant("", dtype=tf.string)
+        )
 
     reasoning_dataset = make_tf_dict(reasoning_dataset)
 
@@ -276,7 +331,8 @@ def make_dataset_from_rlds(
             task["language_instruction"] = traj.pop(language_key)
 
         file_name = traj["traj_metadata"]["episode_metadata"]["file_path"][0]
-        episode_id = traj["traj_metadata"]["episode_metadata"]["episode_id"][0]
+        demo_key = "demo_id" if "demo_id" in traj["traj_metadata"]["episode_metadata"].keys() else "episode_id"
+        episode_id = traj["traj_metadata"]["episode_metadata"][demo_key][0]
 
         file_names = tf.repeat(file_name, traj_len)
         episode_ids = tf.as_string(tf.repeat(episode_id, traj_len))
