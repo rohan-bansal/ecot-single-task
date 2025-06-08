@@ -381,9 +381,25 @@ def make_dataset_from_rlds(
     elif dataset_statistics is None:
         full_dataset = dl.DLataset.from_rlds(
             builder, split="all", shuffle=False, num_parallel_reads=num_parallel_reads
-        ).traj_map(restructure, num_parallel_calls)
+        )
+        
+        # Log initial dataset info
+        try:
+            initial_size = builder.info.splits['all'].num_examples
+            overwatch.info(f"Full dataset size from builder info: {initial_size} examples")
+        except Exception as e:
+            overwatch.warning(f"Could not get initial dataset size: {str(e)}")
 
         full_dataset = full_dataset.ignore_errors()
+        full_dataset = full_dataset.traj_map(restructure, num_parallel_calls)
+
+        # Add size check after traj_map
+        try:
+            count_after_map = full_dataset.reduce(0, lambda x, _: x + 1).numpy()
+            overwatch.info(f"Full dataset size after traj_map: {count_after_map}")
+        except Exception as e:
+            overwatch.warning(f"Error counting dataset after traj_map: {str(e)}")
+
         # tries to load from cache, otherwise computes on the fly
         dataset_statistics = get_dataset_statistics(
             full_dataset,
@@ -418,13 +434,12 @@ def make_dataset_from_rlds(
     
     # Apply the task filter EARLY, right after restructuring but before normalization
     # This filters the dataset once at creation time, not during training
-    print("Applying single task filter...")
     dataset = dataset.filter(single_task_filter)
-    
-    # Count filtered trajectories for debugging
-    # print("Counting filtered trajectories...")
-    # filtered_count = dataset.reduce(0, lambda x, _: x + 1).numpy()
-    # print(f"Filtered dataset contains {filtered_count} trajectories")
+
+    try:
+        overwatch.info(f"Training dataset size after single task filter: {dataset.reduce(0, lambda x, _: x + 1).numpy()}")
+    except Exception as e:
+        overwatch.warning(f"Error counting dataset after single task filter: {str(e)}")
     
     # Apply normalization after filtering
     dataset = dataset.traj_map(
