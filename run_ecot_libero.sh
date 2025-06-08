@@ -11,12 +11,13 @@
 #SBATCH --requeue
 
 export PYTHONUNBUFFERED=TRUE
-source ~/.bashrc
-conda deactivate
-conda activate ecot
+# source ~/.bashrc
+# conda deactivate
+source /coc/flash7/zhenyang/miniconda3/etc/profile.d/conda.sh
+conda activate openvla
 
 nvidia-smi
 
-cd /srv/rl2-lab/flash7/rbansal66/embodied-CoT
+cd /srv/rl2-lab/flash7/zhenyang/ecot-single-task
 
 srun -u torchrun --standalone --nnodes 1 --nproc-per-node 8 --master_port=25678 vla-scripts/train.py --vla.type "prism-dinosiglip-224px+mx-libero-90" --data_root_dir /srv/rl2-lab/flash7/rbansal66/embodied-CoT/data/embodied_features_and_demos_libero --run_root_dir /srv/rl2-lab/flash7/rbansal66/embodied-CoT/runs --wandb_project ecot_reproduce_libero --wandb_entity solace
