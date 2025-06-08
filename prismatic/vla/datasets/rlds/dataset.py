@@ -40,7 +40,7 @@ tf.config.set_visible_devices([], "GPU")
 
 def single_task_filter(x):
     # Use regex to match the full instruction (allows for minor variations)
-    tf.print(x["task"]["language_instruction"])
+    # tf.print(x["task"]["language_instruction"])
     # matches = tf.strings.regex_full_match(x["task"]["language_instruction"], b"move the brown toy to the lower right burner")
     matches = tf.strings.regex_full_match(x["task"]["language_instruction"], b"put the chocolate pudding to the right of the plate")
     # Remove the tf.print to stop the spam during training
@@ -235,7 +235,10 @@ def make_dataset_from_rlds(
                 # First, collect all step data and sort by step index for proper lookahead
                 step_data_list = []
                 for step_idx, step_data in episode_data.items():
+                    # TODO: make this configurable
                     expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement", "bboxes", "gripper"]
+                    # expected_keys = ["bboxes", "gripper"]
+                    # expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement"]
                     if isinstance(step_data, dict) and any(key in step_data for key in expected_keys):
                         step_data_list.append((int(step_idx), step_data))
                 
