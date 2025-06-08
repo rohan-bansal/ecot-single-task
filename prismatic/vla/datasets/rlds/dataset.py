@@ -164,32 +164,42 @@ def make_dataset_from_rlds(
         keys = []
         values = []
 
-        def reasoning_dict_to_str(d):
+        def reasoning_dict_to_str(d, file_name):
             tags = get_cot_tags_list()[:-1]  # exclude ACTION
             database_keys = get_cot_database_keys()
+
+            # extract 
             
             # Map your new dictionary keys to the expected database keys
             key_mapping = {
-                "subtask_reasoning": "subtask_reason",
-                "movement_reasoning": "move_reason", 
-                "movement": "move"
+                "subtask_reason": "subtask_reasoning",
+                "move_reason": "movement_reasoning", 
+                "move": "movement",
+                # "task": "plan"
             }
+
+            plan = file_name.split("_")[2:]
+            plan = plan[:-1]
+            plan = " ".join(plan)
             
             reasoning_parts = []
             for tag in tags:
                 expected_key = database_keys[tag]
-                
+
+                # print(expected_key)
+
                 # Use the mapped key if it exists, otherwise use the expected key
                 actual_key = key_mapping.get(expected_key, expected_key)
                 
                 if actual_key in d:
                     value = d[actual_key]
+
                     # Handle different data types
                     if isinstance(value, dict):
                         # Convert dict to string representation (for plan, bboxes)
                         if actual_key == "plan":
                             # Convert plan dict to a readable string
-                            value = "; ".join([f"Step {k}: {v}" for k, v in value.items()])
+                            value = ". ".join([f"{v}" for _, v in value.items()])
                         elif actual_key == "bboxes":
                             # Convert bboxes dict to string
                             value = ", ".join([f"{name} {box}" for name, box in value.items()])
@@ -201,6 +211,9 @@ def make_dataset_from_rlds(
                     else:
                         value = str(value)
                     
+                    reasoning_parts.append((tag, value))
+                elif actual_key == "task":
+                    value = plan
                     reasoning_parts.append((tag, value))
                 else:
                     # If key doesn't exist, use empty string
@@ -215,58 +228,56 @@ def make_dataset_from_rlds(
             for episode_id in raw_dict[file_name].keys():
                 episode_data = raw_dict[file_name][episode_id]
                 
-                # Check if this is the old format with nested "reasoning" key
-                if "reasoning" in episode_data:
-                    # Old format - has nested reasoning dict indexed by steps
-                    has_reasoning[1] += len(episode_data["reasoning"])
-                    for step_idx in episode_data["reasoning"].keys():
-                        keys.append(file_name + "_" + str(episode_id) + "_" + step_idx)
-                        reasoning_dict = episode_data["reasoning"][step_idx]
-
-                        # Add gripper and bboxes from features if available
-                        gripper_lookahead_n = 5
-                        if "features" in episode_data:
-                            trajectory_features = episode_data["features"]
-                            
-                            reasoning_dict["gripper"] = ""
-                            if "gripper_position" in trajectory_features:
-                                if trajectory_features["gripper_position"] is not None:
-                                    if 0 <= int(step_idx) < len(trajectory_features["gripper_position"]):
-                                        future_positions = []
-                                        for j in range(gripper_lookahead_n):
-                                            if int(step_idx) + j < len(trajectory_features["gripper_position"]):
-                                                future_positions += trajectory_features["gripper_position"][int(step_idx) + j]
-                                            else:
-                                                future_positions += future_positions[-2:]
-                                        reasoning_dict["gripper"] = str(future_positions)
-
-                            reasoning_dict["bboxes"] = ""
-                            if "bboxes" in trajectory_features:
-                                if trajectory_features["bboxes"] is not None:
-                                    if 0 <= int(step_idx) < len(trajectory_features["bboxes"]):
-                                        boxes_list = trajectory_features["bboxes"][int(step_idx)]
-                                        reasoning_dict["bboxes"] = ", ".join(
-                                            [f"{name} {box!s}" for prob, name, box in boxes_list]
-                                        )
-
-                        values.append(reasoning_dict_to_str(reasoning_dict))
+                # New format - each step is directly indexed in the episode
+                # The episode_data itself contains step indices as keys
+                step_count = 0
                 
-                else:
-                    # New format - each step is directly indexed in the episode
-                    # The episode_data itself contains step indices as keys
-                    step_count = 0
-                    for step_idx, step_data in episode_data.items():
-                        # Check if this step has reasoning data
-                        expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement", "bboxes", "gripper"]
-                        if isinstance(step_data, dict) and any(key in step_data for key in expected_keys):
-                            keys.append(file_name + "_" + str(episode_id) + "_" + str(step_idx))
-                            values.append(reasoning_dict_to_str(step_data))
-                            step_count += 1
+                # First, collect all step data and sort by step index for proper lookahead
+                step_data_list = []
+                for step_idx, step_data in episode_data.items():
+                    expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement", "bboxes", "gripper"]
+                    if isinstance(step_data, dict) and any(key in step_data for key in expected_keys):
+                        step_data_list.append((int(step_idx), step_data))
+                
+                # Sort by step index
+                step_data_list.sort(key=lambda x: x[0])
+                
+                # Process each step with gripper lookahead
+                gripper_lookahead_n = 5
+                for i, (step_idx, step_data) in enumerate(step_data_list):
+                    # Create a copy of step_data to avoid modifying the original
+                    enhanced_step_data = step_data.copy()
                     
-                    if step_count > 0:
-                        has_reasoning[1] += step_count
-                    else:
-                        has_reasoning[0] += 1
+                    # Add gripper lookahead functionality
+                    if "gripper" in enhanced_step_data:
+                        current_gripper = enhanced_step_data["gripper"]
+                        if isinstance(current_gripper, list) and len(current_gripper) >= 2:
+                            # Start with current gripper position
+                            future_positions = current_gripper.copy()
+                            
+                            # Look ahead for future gripper positions
+                            for j in range(1, gripper_lookahead_n):
+                                if i + j < len(step_data_list):
+                                    # Get future gripper position
+                                    future_step_data = step_data_list[i + j][1]
+                                    if "gripper" in future_step_data and isinstance(future_step_data["gripper"], list):
+                                        future_positions.extend(future_step_data["gripper"])
+                                else:
+                                    # If no more future positions, repeat the last known position
+                                    if len(future_positions) >= 2:
+                                        future_positions.extend(future_positions[-2:])
+                            
+                            # Update the gripper data with lookahead positions
+                            enhanced_step_data["gripper"] = future_positions
+                    
+                    keys.append(file_name + "_" + str(episode_id) + "_" + str(step_idx))
+                    values.append(reasoning_dict_to_str(enhanced_step_data, file_name))
+                    step_count += 1
+                
+                if step_count > 0:
+                    has_reasoning[1] += step_count
+                else:
+                    has_reasoning[0] += 1
 
         print("Example reasoning:", keys[0] if keys else "None", values[0] if values else "None")
         print("Reasoning presence statistics [# has not, # has]:", has_reasoning)
