@@ -40,7 +40,7 @@ tf.config.set_visible_devices([], "GPU")
 
 def single_task_filter(x):
     # Use regex to match the full instruction (allows for minor variations)
-    tf.print(x["task"]["language_instruction"])
+    # tf.print(x["task"]["language_instruction"])
     # matches = tf.strings.regex_full_match(x["task"]["language_instruction"], b"move the brown toy to the lower right burner")
     matches = tf.strings.regex_full_match(x["task"]["language_instruction"], b"put the chocolate pudding to the right of the plate")
     # Remove the tf.print to stop the spam during training
@@ -435,6 +435,8 @@ def make_dataset_from_rlds(
         ),
         num_parallel_calls,
     )
+
+    dataset = dataset.ignore_errors()
     
     return dataset, dataset_statistics
 
