@@ -236,9 +236,9 @@ def make_dataset_from_rlds(
                 step_data_list = []
                 for step_idx, step_data in episode_data.items():
                     # TODO: make this configurable
-                    expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement", "bboxes", "gripper"]
+                    # expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement", "bboxes", "gripper"]
                     # expected_keys = ["bboxes", "gripper"]
-                    # expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement"]
+                    expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement"]
                     if isinstance(step_data, dict):
                         # Create new dict with only expected keys that exist in step_data
                         filtered_step_data = {key: step_data[key] for key in expected_keys if key in step_data}

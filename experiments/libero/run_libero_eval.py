@@ -39,8 +39,8 @@ from experiments.libero.libero_utils import (
     quat2axisangle,
     save_rollout_video,
 )
-from experiments.robot.openvla_utils import get_processor
-from experiments.robot.robot_utils import (
+from experiments.openvla_utils import get_processor
+from experiments.robot_utils import (
     DATE_TIME,
     get_action,
     get_image_resize_size,
@@ -110,11 +110,44 @@ def eval_libero(cfg: GenerateConfig) -> None:
         if cfg.unnorm_key not in model.norm_stats and f"{cfg.unnorm_key}_no_noops" in model.norm_stats:
             cfg.unnorm_key = f"{cfg.unnorm_key}_no_noops"
         assert cfg.unnorm_key in model.norm_stats, f"Action un-norm key {cfg.unnorm_key} not found in VLA `norm_stats`!"
+    elif cfg.model_family == "ecot":
+
+        # Try different possible keys for normalization statistics
+        possible_keys = [
+            cfg.unnorm_key,  # Original key
+            f"{cfg.unnorm_key}_no_noops",  # No-noops version
+            "libero",  # Generic libero key
+            "libero_lm_90",
+            "libero_no_noops",  # Generic libero no-noops key
+            "ecot_libero",  # Embodied-CoT specific key
+            "ecot_libero_no_noops"  # Embodied-CoT no-noops key
+        ]
+        
+        found_key = None
+        for key in possible_keys:
+            if key in model.norm_stats:
+                cfg.unnorm_key = key
+                found_key = key
+                break
+                
+        if found_key is None:
+            raise ValueError(
+                f"No valid action un-normalization key found in model's norm_stats. "
+                f"Available keys: {list(model.norm_stats.keys())}. "
+                f"Tried keys: {possible_keys}"
+            )
+        print(f"Using normalization statistics key: {found_key}")
+
+    else:
+        raise ValueError(f"Unexpected `model_family` found in config: {cfg.model_family}")
 
     # [OpenVLA] Get Hugging Face processor
     processor = None
     if cfg.model_family == "openvla":
         processor = get_processor(cfg)
+    # For Embodied-CoT, the processor functionality is handled by the vision_backbone and image_transform
+    elif cfg.model_family == "ecot":
+        pass
 
     # Initialize local logging
     run_id = f"EVAL-{cfg.task_suite_name}-{cfg.model_family}-{DATE_TIME}"
@@ -207,6 +240,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
                         ),
                     }
 
+                    import pdb; pdb.set_trace()
                     # Query model to get action
                     action = get_action(
                         cfg,

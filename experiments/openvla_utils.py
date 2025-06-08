@@ -34,21 +34,31 @@ def get_vla(cfg):
     print("[*] Instantiating Pretrained VLA model")
     print("[*] Loading in BF16 with Flash-Attention Enabled")
 
-    # Register OpenVLA model to HF Auto Classes (not needed if the model is on HF Hub)
-    AutoConfig.register("openvla", OpenVLAConfig)
-    AutoImageProcessor.register(OpenVLAConfig, PrismaticImageProcessor)
-    AutoProcessor.register(OpenVLAConfig, PrismaticProcessor)
-    AutoModelForVision2Seq.register(OpenVLAConfig, OpenVLAForActionPrediction)
+    if cfg.model_family == "openvla":
+        # Register OpenVLA model to HF Auto Classes (not needed if the model is on HF Hub)
+        AutoConfig.register("openvla", OpenVLAConfig)
+        AutoImageProcessor.register(OpenVLAConfig, PrismaticImageProcessor)
+        AutoProcessor.register(OpenVLAConfig, PrismaticProcessor)
+        AutoModelForVision2Seq.register(OpenVLAConfig, OpenVLAForActionPrediction)
 
-    vla = AutoModelForVision2Seq.from_pretrained(
-        cfg.pretrained_checkpoint,
-        attn_implementation="flash_attention_2",
-        torch_dtype=torch.bfloat16,
-        load_in_8bit=cfg.load_in_8bit,
-        load_in_4bit=cfg.load_in_4bit,
-        low_cpu_mem_usage=True,
-        trust_remote_code=True,
-    )
+    # For Embodied-CoT, we need to use the prismatic model loading path
+    if cfg.model_family == "ecot":
+        from prismatic.models import load_vla as prismatic_load_vla
+        vla = prismatic_load_vla(
+            cfg.pretrained_checkpoint,
+            load_for_training=False,
+            model_type="pretrained"
+        )
+    else:
+        vla = AutoModelForVision2Seq.from_pretrained(
+            cfg.pretrained_checkpoint,
+            attn_implementation="flash_attention_2",
+            torch_dtype=torch.bfloat16,
+            load_in_8bit=cfg.load_in_8bit,
+            load_in_4bit=cfg.load_in_4bit,
+            low_cpu_mem_usage=True,
+            trust_remote_code=True,
+        )
 
     # Move model to device.
     # Note: `.to()` is not supported for 8-bit or 4-bit bitsandbytes models, but the model will
@@ -57,7 +67,10 @@ def get_vla(cfg):
         vla = vla.to(DEVICE)
 
     # Load dataset stats used during finetuning (for action un-normalization).
-    dataset_statistics_path = os.path.join(cfg.pretrained_checkpoint, "dataset_statistics.json")
+    if cfg.model_family == "ecot":
+        dataset_statistics_path = os.path.join(os.path.dirname(cfg.pretrained_checkpoint), "../dataset_statistics.json")
+    else:
+        dataset_statistics_path = os.path.join(cfg.pretrained_checkpoint, "dataset_statistics.json")
     if os.path.isfile(dataset_statistics_path):
         with open(dataset_statistics_path, "r") as f:
             norm_stats = json.load(f)
@@ -73,8 +86,17 @@ def get_vla(cfg):
 
 
 def get_processor(cfg):
-    """Get VLA model's Hugging Face processor."""
-    processor = AutoProcessor.from_pretrained(cfg.pretrained_checkpoint, trust_remote_code=True)
+    """Gets the HuggingFace processor for a VLA model."""
+    print("[*] Loading HuggingFace Processor")
+    
+    if cfg.model_family == "ecot":
+        # For Embodied-CoT, we need to create a processor directly since we're using local files
+        from transformers import SiglipProcessor
+        processor = SiglipProcessor()
+    else:
+        # For OpenVLA, we can use the standard HF auto processor
+        processor = AutoProcessor.from_pretrained(cfg.pretrained_checkpoint, trust_remote_code=True)
+    
     return processor
 
 
@@ -130,8 +152,6 @@ def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, c
     image = image.convert("RGB")
 
     # (If trained with image augmentations) Center crop image and then resize back up to original size.
-    # IMPORTANT: Let's say crop scale == 0.9. To get the new height and width (post-crop), multiply
-    #            the original height and width by sqrt(0.9) -- not 0.9!
     if center_crop:
         batch_size = 1
         crop_scale = 0.9
@@ -155,16 +175,27 @@ def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, c
         image = image.convert("RGB")
 
     # Build VLA prompt
-    if "openvla-v01" in base_vla_name:  # OpenVLA v0.1
+    if "openvla-v01" in base_vla_name or "ecot" in base_vla_name:  # OpenVLA v0.1
         prompt = (
             f"{OPENVLA_V01_SYSTEM_PROMPT} USER: What action should the robot take to {task_label.lower()}? ASSISTANT:"
         )
-    else:  # OpenVLA
-        prompt = f"In: What action should the robot take to {task_label.lower()}?\nOut:"
 
-    # Process inputs.
-    inputs = processor(prompt, image).to(DEVICE, dtype=torch.bfloat16)
+    # Process inputs based on model type
+    if isinstance(vla, OpenVLAForActionPrediction):
+        # OpenVLA uses the HuggingFace processor
+        inputs = processor(prompt, image).to(DEVICE, dtype=torch.bfloat16)
+    else:
+        # Embodied-CoT uses the vision_backbone's image_transform
+        image_transform = vla.vision_backbone.get_image_transform()
+        image_tensor = image_transform(image).unsqueeze(0).to(DEVICE, dtype=torch.bfloat16)
+        prompt_builder = vla.get_prompt_builder()
+        prompt_tokens = prompt_builder.build_prompt(prompt)
+        inputs = {
+            "input_ids": prompt_tokens["input_ids"].to(DEVICE),
+            "attention_mask": prompt_tokens["attention_mask"].to(DEVICE),
+            "pixel_values": image_tensor
+        }
 
-    # Get action.
+    # Get action
     action = vla.predict_action(**inputs, unnorm_key=unnorm_key, do_sample=False)
     return action

@@ -76,7 +76,7 @@ class Exp_SigLIP_224px_Bridge(VLAConfig):
 
     # Optimization Parameters
     epochs: int = 1000
-    max_steps: Optional[int] = 200
+    max_steps: Optional[int] = 1000
 
     expected_world_size: int = 8
     global_batch_size: int = 128
