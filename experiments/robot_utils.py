@@ -10,6 +10,7 @@ import torch
 from experiments.openvla_utils import (
     get_vla,
     get_vla_action,
+    get_vla_action_cot,
 )
 
 # Initialize important constants and pretty-printing mode in NumPy.
@@ -60,11 +61,16 @@ def get_image_resize_size(cfg):
     return resize_size
 
 
-def get_action(cfg, model, obs, task_label, processor=None):
+def get_action(cfg, model, obs, task_label, processor=None, info_dict=None):
     """Queries the model to get an action."""
-    if cfg.model_family == "openvla" or cfg.model_family == "ecot":
+    if cfg.model_family == "openvla":
         action = get_vla_action(
             model, processor, cfg.pretrained_checkpoint, obs, task_label, cfg.unnorm_key, center_crop=cfg.center_crop
+        )
+        assert action.shape == (ACTION_DIM,)
+    elif cfg.model_family == "ecot":
+        action = get_vla_action_cot(
+            model, processor, cfg.pretrained_checkpoint, obs, task_label, cfg.unnorm_key, center_crop=cfg.center_crop, info_dict=info_dict
         )
         assert action.shape == (ACTION_DIM,)
     else:

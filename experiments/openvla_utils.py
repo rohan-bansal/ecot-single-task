@@ -145,8 +145,53 @@ def crop_and_resize(image, crop_scale, batch_size):
 
     return image
 
-
 def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, center_crop=False):
+    """Generates an action with the VLA policy."""
+    image = Image.fromarray(obs["full_image"])
+    image = image.convert("RGB")
+
+    # (If trained with image augmentations) Center crop image and then resize back up to original size.
+    # IMPORTANT: Let's say crop scale == 0.9. To get the new height and width (post-crop), multiply
+    #            the original height and width by sqrt(0.9) -- not 0.9!
+    if center_crop:
+        batch_size = 1
+        crop_scale = 0.9
+
+        # Convert to TF Tensor and record original data type (should be tf.uint8)
+        image = tf.convert_to_tensor(np.array(image))
+        orig_dtype = image.dtype
+
+        # Convert to data type tf.float32 and values between [0,1]
+        image = tf.image.convert_image_dtype(image, tf.float32)
+
+        # Crop and then resize back to original size
+        image = crop_and_resize(image, crop_scale, batch_size)
+
+        # Convert back to original data type
+        image = tf.clip_by_value(image, 0, 1)
+        image = tf.image.convert_image_dtype(image, orig_dtype, saturate=True)
+
+        # Convert back to PIL Image
+        image = Image.fromarray(image.numpy())
+        image = image.convert("RGB")
+
+    # Build VLA prompt
+    if "openvla-v01" in base_vla_name:  # OpenVLA v0.1
+        prompt = (
+            f"{OPENVLA_V01_SYSTEM_PROMPT} USER: What action should the robot take to {task_label.lower()}? ASSISTANT:"
+        )
+    else:  # OpenVLA
+        prompt = f"In: What action should the robot take to {task_label.lower()}?\nOut:"
+
+    # Process inputs using the provided processor
+    inputs = processor(prompt, image).to(DEVICE, dtype=torch.bfloat16)
+
+    # Get action
+    action = vla.predict_action(**inputs, unnorm_key=unnorm_key, do_sample=False)
+    return action
+
+
+def get_vla_action_cot(vla, processor, base_vla_name, obs, task_label, unnorm_key, center_crop=False, info_dict=None):
     """Generates an action with the VLA policy."""
     image = Image.fromarray(obs["full_image"])
     image = image.convert("RGB")
@@ -174,28 +219,7 @@ def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, c
         image = Image.fromarray(image.numpy())
         image = image.convert("RGB")
 
-    # Build VLA prompt
-    if "openvla-v01" in base_vla_name or "ecot" in base_vla_name:  # OpenVLA v0.1
-        prompt = (
-            f"{OPENVLA_V01_SYSTEM_PROMPT} USER: What action should the robot take to {task_label.lower()}? ASSISTANT:"
-        )
+    assert image.size[0] == image.size[1]
 
-    # Process inputs based on model type
-    if isinstance(vla, OpenVLAForActionPrediction):
-        # OpenVLA uses the HuggingFace processor
-        inputs = processor(prompt, image).to(DEVICE, dtype=torch.bfloat16)
-    else:
-        # Embodied-CoT uses the vision_backbone's image_transform
-        image_transform = vla.vision_backbone.get_image_transform()
-        image_tensor = image_transform(image).unsqueeze(0).to(DEVICE, dtype=torch.bfloat16)
-        prompt_builder = vla.get_prompt_builder()
-        prompt_tokens = prompt_builder.build_prompt(prompt)
-        inputs = {
-            "input_ids": prompt_tokens["input_ids"].to(DEVICE),
-            "attention_mask": prompt_tokens["attention_mask"].to(DEVICE),
-            "pixel_values": image_tensor
-        }
-
-    # Get action
-    action = vla.predict_action(**inputs, unnorm_key=unnorm_key, do_sample=False)
+    action = vla.predict_action(image, task_label, unnorm_key=unnorm_key, do_sample=False, info_dict=info_dict)
     return action

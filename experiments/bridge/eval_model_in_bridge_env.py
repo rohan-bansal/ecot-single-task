@@ -18,6 +18,9 @@ Usage:
         --pretrained_checkpoint <CHECKPOINT_PATH>
 """
 
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Prevent tokenizer forking warning
+
 import sys
 import time
 import traceback

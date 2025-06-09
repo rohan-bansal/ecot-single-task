@@ -13,5 +13,3 @@ python experiments/libero/run_libero_eval.py \
   --pretrained_checkpoint $cpkt \
   --task_suite_name libero_90 \
   --center_crop True
-
-# online ckpt Embodied-CoT/ecot-openvla-7b-oxe
