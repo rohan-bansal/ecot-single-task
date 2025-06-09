@@ -285,7 +285,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
             # Save a replay video of the episode
             save_rollout_video(
-                replay_images, total_episodes, success=done, task_description=task_description, log_file=log_file
+                replay_images, total_episodes, success=done, task_description=task_description, log_file=log_file, run_id=run_id
             )
 
             # Log current results
