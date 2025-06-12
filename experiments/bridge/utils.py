@@ -12,14 +12,14 @@ import numpy as np
 import torch
 from accelerate.utils import set_seed
 from PIL import Image
-from widowx_envs.widowx_env_service import WidowXClient, WidowXConfigs
+# from widowx_envs.widowx_env_service import WidowXClient, WidowXConfigs
 
 from prismatic.models import load_vla
 from prismatic.models.materialize import VISION_BACKBONES
 from prismatic.util.cot_utils import CotTag, get_cot_tags_list
 
-sys.path.append("../..")  # hack so that the interpreter can find experiments.robot
-from experiments.bridge.widowx_env import WidowXGym
+# sys.path.append("../..")  # hack so that the interpreter can find experiments.robot
+# from experiments.bridge.widowx_env import WidowXGym
 
 # Initialize important constants and pretty-printing mode in NumPy.
 ACTION_DIM = 7
@@ -325,21 +325,36 @@ def split_reasoning(text, tags):
 def get_metadata(reasoning):
     metadata = {"gripper": [[0, 0]], "bboxes": dict()}
 
-    if f" {CotTag.GRIPPER_POSITION.value}" in reasoning:
-        gripper_pos = reasoning[f" {CotTag.GRIPPER_POSITION.value}"]
-        gripper_pos = gripper_pos.split("[")[-1]
-        gripper_pos = gripper_pos.split("]")[0]
-        gripper_pos = [int(x) for x in gripper_pos.split(",")]
-        gripper_pos = [(gripper_pos[2 * i], gripper_pos[2 * i + 1]) for i in range(len(gripper_pos) // 2)]
-        metadata["gripper"] = gripper_pos
+    # if f" {CotTag.GRIPPER_POSITION.value}" in reasoning:
+    #     gripper_pos = reasoning[f" {CotTag.GRIPPER_POSITION.value}"]
+    #     print(gripper_pos)
+    #     gripper_pos = gripper_pos.split("[")[-1]
+    #     gripper_pos = gripper_pos.split("]")[0]
+    #     gripper_pos = [int(x) for x in gripper_pos.split(",")]
+    #     gripper_pos = [(gripper_pos[2 * i], gripper_pos[2 * i + 1]) for i in range(len(gripper_pos) // 2)]
+    #     metadata["gripper"] = gripper_pos
+
+    # if f" {CotTag.VISIBLE_OBJECTS.value}" in reasoning:
+    #     for sample in reasoning[f" {CotTag.VISIBLE_OBJECTS.value}"].split("]"):
+    #         obj = sample.split("[")[0]
+    #         if obj == "":
+    #             continue
+    #         coords = [int(n) for n in sample.split("[")[-1].split(",")]
+    #         metadata["bboxes"][obj] = coords
 
     if f" {CotTag.VISIBLE_OBJECTS.value}" in reasoning:
-        for sample in reasoning[f" {CotTag.VISIBLE_OBJECTS.value}"].split("]"):
-            obj = sample.split("[")[0]
-            if obj == "":
+        visible_objects_str = reasoning[f" {CotTag.VISIBLE_OBJECTS.value}"].strip()
+        object_strings = visible_objects_str.replace("]], ", "]]|").split("|")
+
+        for item in object_strings:
+            try:
+                name, coords_str = item.split(" [[", 1)
+                name = name.strip()
+                coords_str = coords_str.replace("[", "").replace("]", "").replace(" ", "")
+                coords = [int(c) for c in coords_str.split(',')]
+                metadata["bboxes"][name] = coords
+            except ValueError:
                 continue
-            coords = [int(n) for n in sample.split("[")[-1].split(",")]
-            metadata["bboxes"][obj] = coords
 
     return metadata
 
@@ -374,6 +389,8 @@ def draw_bboxes(img, bboxes, img_size=(640, 480)):
         cv2.rectangle(
             img,
             resize_pos((bbox[0], bbox[1]), img_size),
+            # (bbox[0], bbox[1]),
+            # (bbox[2], bbox[3]),
             resize_pos((bbox[2], bbox[3]), img_size),
             name_to_random_color(name),
             2,
@@ -382,6 +399,7 @@ def draw_bboxes(img, bboxes, img_size=(640, 480)):
             img,
             show_name,
             resize_pos((bbox[0], bbox[1] + 6), img_size),
+            # (bbox[0], bbox[1] + 6),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
             (255, 255, 255),

@@ -29,6 +29,14 @@ import tqdm
 from libero.libero import benchmark
 
 import wandb
+import cv2
+
+from experiments.bridge.utils import (
+    draw_bboxes,
+    draw_gripper,
+    draw_interactive,
+    make_reasoning_image,
+)
 
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Prevent tokenizer forking warning
@@ -261,6 +269,21 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
                 # Normalize gripper action [0,1] -> [-1,+1] because the environment expects the latter
                 action = normalize_gripper_action(action, binarize=True)
+
+                img2 = img.copy()
+                # img2 = resize_image(img2, (256, 256))
+                reasoning_img, metadata = make_reasoning_image(info_dict["decoded_tokens"])
+                print(metadata)
+                # draw_gripper(video_image, metadata["gripper"])
+                draw_bboxes(img2, metadata["bboxes"], img_size=(224, 224))
+                # draw_interactive(video_image, model.use_interactive)
+                # img2 = np.concatenate([img2, reasoning_img], axis=1)
+
+                # write to file
+                bgr_img = cv2.cvtColor(img2, cv2.COLOR_RGB2BGR)
+                filename = f"/srv/rl2-lab/flash7/rbansal66/embodied-CoT/rollout_images/image_{task_id}_{episode_idx}_{t}.png"
+                cv2.imwrite(filename, bgr_img)
+                print(f"Saved image to {filename}")
 
                 # [OpenVLA] The dataloader flips the sign of the gripper action to align with other datasets
                 # (0 = close, 1 = open), so flip it back (-1 = open, +1 = close) before executing the action
