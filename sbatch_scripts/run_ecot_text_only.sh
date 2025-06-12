@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=train_ecot_text_only
-#SBATCH --output=/srv/rl2-lab/flash7/zhenyang/ecot-single-task/runs/logs/train_ecot_text_only.out
-#SBATCH --error=/srv/rl2-lab/flash7/zhenyang/ecot-single-task/runs/logs/train_ecot_text_only.err
+#SBATCH --output=/srv/rl2-lab/flash7/zhenyang/ecot-single-task/runs/logs/train_ecot_text_only_0609.out
+#SBATCH --error=/srv/rl2-lab/flash7/zhenyang/ecot-single-task/runs/logs/train_ecot_text_only_0609.err
 #SBATCH --partition=overcap
 #SBATCH --time=48:00:00
 #SBATCH --cpus-per-task=15
@@ -11,8 +11,10 @@
 #SBATCH --requeue
 
 # EXP_NAME="BBox+Gripper"
-EXP_NAME="Plan+Task+Reasoning"
+EXP_NAME="Plan+Task+Reasoning_0609"
 TASK_NAME="put_chocolate_pudding_right_of_plate"
+
+SAVE_INTERVAL=5 # for each graident steps
 
 export PYTHONUNBUFFERED=TRUE
 source /coc/flash7/zhenyang/miniconda3/etc/profile.d/conda.sh
@@ -32,4 +34,5 @@ srun -u torchrun \
     --data_root_dir /coc/flash7/zhenyang/data/embodied_features_and_demos_libero \
     --run_root_dir /srv/rl2-lab/flash7/zhenyang/ecot-single-task/runs \
     --wandb_project ecot_reproduce_libero \
-    --wandb_entity zhenyang
+    --wandb_entity zhenyang \
+    --save_interval $SAVE_INTERVAL

@@ -2,10 +2,12 @@
 
 # Directory containing checkpoints
 # CKPT_DIR="/coc/flash7/zhenyang/ecot-single-task/runs/ecot-Plan+Task+Reasoning==put_chocolate_pudding_right_of_plate/checkpoints"
-# RUN_NAME="ecot-BBox+Gripper==put_chocolate_pudding_right_of_plate"
+CKPT_DIR="/coc/flash7/zhenyang/ecot-single-task/runs/ecot-Plan+Task+Reasoning_0609==put_chocolate_pudding_right_of_plate/checkpoints"
+RUN_NAME="ecot-Plan+Task+Reasoning==put_chocolate_pudding_right_of_plate" # earlier BBox Folder is for plan+task+reasoning
 
-CKPT_DIR="/coc/flash7/zhenyang/ecot-single-task/runs/ecot-BBox+Gripper==put_chocolate_pudding_right_of_plate/checkpoints"
-RUN_NAME="ecot-BBox+Gripper==put_chocolate_pudding_right_of_plate"
+# CKPT_DIR="/coc/flash7/zhenyang/ecot-single-task/runs/ecot-BBox+Gripper==put_chocolate_pudding_right_of_plate/checkpoints"
+# CKPT_DIR="/coc/flash7/zhenyang/ecot-single-task/runs/ecot-BBox+Gripper_0609==put_chocolate_pudding_right_of_plate/checkpoints"
+# RUN_NAME="ecot-BBox+Gripper_0609==put_chocolate_pudding_right_of_plate"
 
 # Check if directory exists
 if [ ! -d "$CKPT_DIR" ]; then
