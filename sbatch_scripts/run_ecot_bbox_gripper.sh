@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=train_ecot_bbox_gripper  
-#SBATCH --output=/srv/rl2-lab/flash7/zhenyang/ecot-single-task/runs/logs/train_ecot_bbox_gripper_0609.out
-#SBATCH --error=/srv/rl2-lab/flash7/zhenyang/ecot-single-task/runs/logs/train_ecot_bbox_gripper_0609.err
+#SBATCH --output=/srv/rl2-lab/flash7/zhenyang/ecot-single-task/runs/logs/train_ecot_bbox_gripper_0612.out
+#SBATCH --error=/srv/rl2-lab/flash7/zhenyang/ecot-single-task/runs/logs/train_ecot_bbox_gripper_0612.err
 #SBATCH --partition=overcap
 #SBATCH --time=48:00:00
 #SBATCH --cpus-per-task=15
@@ -10,9 +10,10 @@
 #SBATCH --mem-per-gpu=64
 #SBATCH --requeue
 
-EXP_NAME="BBox+Gripper_0609"
+EXP_NAME="BBox+Gripper_0612"
 # EXP_NAME="Plan+Task+Reasoning"
-TASK_NAME="put_chocolate_pudding_right_of_plate"
+# TASK_NAME="put_chocolate_pudding_right_of_plate"
+TASK_NAME="close_the_microwave"
 
 SAVE_INTERVAL=5 # for each graident steps
 

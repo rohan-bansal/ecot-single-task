@@ -26,16 +26,16 @@ from experiments.libero.libero_utils import (
 )
 
 # TODO: specify the dataset and task id to replay.
-libero_path = "/coc/flash7/zhenyang/data/embodied_features_and_demos_libero"
-dataset_name = "libero_lm_90"
-task_id_to_replay = 70 # chocolate task, you can find the id in libero_task_map
+libero_path = "/coc/flash7/zhenyang/data/embodied_features_and_demos_libero/libero_lm_90"
+dataset_name = "libero_90"
+task_id_to_replay = 33 # close the microwave. 70 # chocolate task, you can find the id in libero_task_map
 
 # Load the LIBERO tfds dataset
 tf.config.set_visible_devices(
     [], device_type="gpu"
 )
 print(f"Loading data from dataset: {dataset_name}")
-builder = tfds.builder_from_directory(f"{libero_path}/{dataset_name}/1.0.0")
+builder = tfds.builder_from_directory(f"{libero_path}/1.0.0")
 
 info = builder.info
 print(f"Dataset info: {info}")
@@ -83,7 +83,7 @@ for ep in ds:
     state_replay_images = []
     action_replay_images = []
 
-    for step_idx, step in enumerate(ep["steps"]):
+    for step_idx, step_data in enumerate(ep["steps"]):
         # print(f"Step {step_idx}:")
         # print(f"Image shape: {step['observation']['image'].numpy().shape}")
         # print(f"Action shape: {step['action'].numpy().shape}")
@@ -94,25 +94,28 @@ for ep in ds:
         # img = get_libero_image(obs, resize_size)
         # state_replay_images.append(img)
 
+        # NOTE: the dataset observation and image after get_libero_image is mirrored wrt. y-axis.
         # open loop replay the action
-        action = step['action'].numpy()
+        action = step_data['action'].numpy()
         obs, reward, done, info = env_action.step(action)
         img = get_libero_image(obs, resize_size)
         action_replay_images.append(img)
 
         # record dataset observation images
-        img_dataset = step['observation']['image'].numpy()
+        img_dataset = step_data['observation']['image'].numpy()
         replay_images.append(img_dataset)
+
+        import pdb; pdb.set_trace()
 
     total_episodes += 1
     save_rollout_video(
-        replay_images, total_episodes, success=done, task_description=task_description, log_file=None, run_id="dataset_all"
+        replay_images, total_episodes, success=done, task_description=task_description, log_file=None, run_id=f"{task_description}_dataset_all"
     )       
     # save_rollout_video(
     #     state_replay_images, total_episodes, success=done, task_description=task_description, log_file=None, run_id="state_replay"
     # )       
     save_rollout_video(
-        action_replay_images, total_episodes, success=done, task_description=task_description, log_file=None, run_id="action_replay"
+        action_replay_images, total_episodes, success=done, task_description=task_description, log_file=None, run_id=f"{task_description}_action_replay"
     ) 
 
     # break # only output the first episode

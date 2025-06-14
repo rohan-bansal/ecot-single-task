@@ -27,6 +27,7 @@ import draccus
 import numpy as np
 import tqdm
 from libero.libero import benchmark
+from libero.libero.benchmark.libero_suite_task_map import libero_task_map
 
 import wandb
 
@@ -74,6 +75,7 @@ class GenerateConfig:
     task_suite_name: str = "libero_spatial"          # Task suite. Options: libero_spatial, libero_object, libero_goal, libero_10, libero_90
     num_steps_wait: int = 10                         # Number of steps to wait for objects to stabilize in sim
     num_trials_per_task: int = 50                    # Number of rollouts per task
+    task_description: str = "KITCHEN_SCENE6_close_the_microwave" # TODO: single task description
 
     #################################################################################################################
     # Utils
@@ -179,12 +181,20 @@ def eval_libero(cfg: GenerateConfig) -> None:
     # Get expected image dimensions
     resize_size = get_image_resize_size(cfg)
 
+    task_map = libero_task_map[cfg.task_suite_name]
+    target_task_id = None
+    for idx, task in enumerate(task_map):
+        if task == cfg.task_description:
+            target_task_id = idx
+            break
+    print(f"Task ID: {target_task_id}")
+    print(f"Language instruction: {cfg.task_description}")
+
     # Start evaluation
     total_episodes, total_successes = 0, 0
     for task_id in tqdm.tqdm(range(num_tasks_in_suite)):
         # TODO: testing single task
-        if task_id != 70: # we only train for 'put the chocolate pudding to the right of the plate'
-            print(f"Skipping task {task_id} because we only train for 'put the chocolate pudding to the right of the plate'")
+        if task_id != target_task_id: # 70: # we only train for 'put the chocolate pudding to the right of the plate'
             continue
         
         # Get task

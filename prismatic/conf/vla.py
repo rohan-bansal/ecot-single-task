@@ -75,8 +75,8 @@ class Exp_SigLIP_224px_Bridge(VLAConfig):
     shuffle_buffer_size: int = 100 # 32_000
 
     # Optimization Parameters
-    epochs: int = 1000
-    max_steps: Optional[int] = 1000
+    epochs: int = 1000 # doesn't matter
+    max_steps: Optional[int] = 297_000 # 295_000 fom pretrained checkpoint
 
     expected_world_size: int = 8
     global_batch_size: int = 128
@@ -110,6 +110,13 @@ class Exp_DinoSigLIP_224px_Bridge(Exp_SigLIP_224px_Bridge):
 @dataclass
 class Exp_DinoSigLIP_224px_LIBERO_90(Exp_DinoSigLIP_224px_Bridge):
     vla_id: str = "prism-dinosiglip-224px+mx-libero-90"
+
+    data_mix: str = "libero_lm_90"
+
+@dataclass
+class Exp_DinoSigLIP_224px_LIBERO_90_FreezeViT(Exp_DinoSigLIP_224px_LIBERO_90):
+    vla_id: str = "prism-dinosiglip-224px-icy+mx-libero-90"
+    freeze_vision_backbone: bool = True
 
     data_mix: str = "libero_lm_90"
 
@@ -210,7 +217,6 @@ class VLARegistry(Enum):
     # Sanity Check Configurations =>> BridgeV2
     SIGLIP_224PX_MX_BRIDGE = Exp_SigLIP_224px_Bridge
     DINOSIGLIP_224PX_MX_BRIDGE = Exp_DinoSigLIP_224px_Bridge
-    DINOSIGLIP_224PX_MX_LIBERO_90 = Exp_DinoSigLIP_224px_LIBERO_90
 
     # SigLIP Frozen Backbone Experiment
     FREEZE_SIGLIP_224PX_MX_BRIDGE = Exp_FreezeVIT_SigLIP_224px_Bridge
@@ -231,6 +237,10 @@ class VLARegistry(Enum):
 
     # === DROID Fine-tuning Configs ===
     SIGLIP_224PX_MX_DROID_WIPE = Exp_SigLIP_224px_Droid_Wipe
+
+    # === ECoT Fine-tuning Configs for libero_lm_90 ===
+    DINOSIGLIP_224PX_MX_LIBERO_90 = Exp_DinoSigLIP_224px_LIBERO_90
+    DINOSIGLIP_224PX_MX_LIBERO_90_FREEZE_VIT = Exp_DinoSigLIP_224px_LIBERO_90_FreezeViT
 
     @property
     def vla_id(self) -> str:

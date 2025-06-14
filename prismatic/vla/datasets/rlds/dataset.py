@@ -38,11 +38,32 @@ overwatch = initialize_overwatch(__name__)
 # Configure Tensorflow with *no GPU devices* (to prevent clobber with PyTorch)
 tf.config.set_visible_devices([], "GPU")
 
+# # Configuration for language instruction and expected keys
+# LANGUAGE_INSTRUCTION = "put the chocolate pudding to the right of the plate"
+# EXPECTED_KEYS = {
+#     "bboxes": "bounding boxes of objects",
+#     "gripper": "gripper position and state",
+#     "plan": "task plan",
+#     "subtask_reasoning": "reasoning for subtask",
+#     "subtask": "current subtask",
+#     "movement_reasoning": "reasoning for movement",
+#     "movement": "movement description"
+# }
+
+selected_tasks = [
+    "close the microwave",
+    "put the chocolate pudding to the right of the plate",
+    "put the chocolate pudding to the left of the plate",
+    "put the chocolate pudding to the top of the plate",
+    "put the chocolate pudding to the bottom of the plate",
+]
+
+# TODO: change this to use the selected_tasks list
 def single_task_filter(x):
     # Use regex to match the full instruction (allows for minor variations)
     # tf.print(x["task"]["language_instruction"])
     # matches = tf.strings.regex_full_match(x["task"]["language_instruction"], b"move the brown toy to the lower right burner")
-    matches = tf.strings.regex_full_match(x["task"]["language_instruction"], b"put the chocolate pudding to the right of the plate")
+    matches = tf.strings.regex_full_match(x["task"]["language_instruction"], b"close the microwave")
     # Remove the tf.print to stop the spam during training
     return tf.reduce_any(matches)
 
@@ -236,9 +257,9 @@ def make_dataset_from_rlds(
                 step_data_list = []
                 for step_idx, step_data in episode_data.items():
                     # TODO: make this configurable
-                    # expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement", "bboxes", "gripper"]
+                    expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement", "bboxes", "gripper"]
                     # expected_keys = ["bboxes", "gripper"]
-                    expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement"]
+                    # expected_keys = ["plan", "subtask_reasoning", "subtask", "movement_reasoning", "movement"]
                     if isinstance(step_data, dict):
                         # Create new dict with only expected keys that exist in step_data
                         filtered_step_data = {key: step_data[key] for key in expected_keys if key in step_data}

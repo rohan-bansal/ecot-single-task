@@ -18,6 +18,7 @@ fi
 
 CHECKPOINT_PATH="$1"
 RUN_NAME="$2"
+TASK_DESCRIPTION="$3"
 CKPT_NAME=$(basename "$CHECKPOINT_PATH")
 RUN_ID="${RUN_NAME}_${CKPT_NAME}"
 
@@ -38,4 +39,5 @@ python experiments/libero/run_libero_eval.py \
   --pretrained_checkpoint "$CHECKPOINT_PATH" \
   --task_suite_name libero_90 \
   --run_id "$RUN_ID" \
-  --center_crop True 
+  --center_crop True \
+  --task_description "$TASK_DESCRIPTION"
