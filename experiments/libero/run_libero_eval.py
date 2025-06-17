@@ -27,16 +27,9 @@ import draccus
 import numpy as np
 import tqdm
 from libero.libero import benchmark
+from libero.libero.benchmark.libero_suite_task_map import libero_task_map
 
 import wandb
-import cv2
-
-from experiments.bridge.utils import (
-    draw_bboxes,
-    draw_gripper,
-    draw_interactive,
-    make_reasoning_image,
-)
 
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Prevent tokenizer forking warning
@@ -61,6 +54,14 @@ from experiments.robot_utils import (
     set_seed_everywhere,
 )
 
+from experiments.bridge.utils import (
+    draw_bboxes,
+    make_reasoning_image,
+)
+
+import cv2
+
+
 
 @dataclass
 class GenerateConfig:
@@ -79,9 +80,10 @@ class GenerateConfig:
     #################################################################################################################
     # LIBERO environment-specific parameters
     #################################################################################################################
-    task_suite_name: str = "libero_spatial"          # Task suite. Options: libero_spatial, libero_object, libero_goal, libero_10, libero_90
+    task_suite_name: str = "libero_90"          # Task suite. Options: libero_spatial, libero_object, libero_goal, libero_10, libero_90
     num_steps_wait: int = 10                         # Number of steps to wait for objects to stabilize in sim
     num_trials_per_task: int = 50                    # Number of rollouts per task
+    task_description: str = "KITCHEN_SCENE6_close_the_microwave" # TODO: single task description
 
     #################################################################################################################
     # Utils
@@ -187,12 +189,21 @@ def eval_libero(cfg: GenerateConfig) -> None:
     # Get expected image dimensions
     resize_size = get_image_resize_size(cfg)
 
+    task_map = libero_task_map[cfg.task_suite_name]
+    print(task_map)
+    target_task_id = None
+    for idx, task in enumerate(task_map):
+        if task == cfg.task_description:
+            target_task_id = idx
+            break
+    print(f"Task ID: {target_task_id}")
+    print(f"Language instruction: {cfg.task_description}")
+
     # Start evaluation
     total_episodes, total_successes = 0, 0
     for task_id in tqdm.tqdm(range(num_tasks_in_suite)):
         # TODO: testing single task
-        if task_id != 70: # we only train for 'put the chocolate pudding to the right of the plate'
-            print(f"Skipping task {task_id} because we only train for 'put the chocolate pudding to the right of the plate'")
+        if task_id != target_task_id: # 70: # we only train for 'put the chocolate pudding to the right of the plate'
             continue
         
         # Get task
@@ -267,19 +278,17 @@ def eval_libero(cfg: GenerateConfig) -> None:
                     info_dict=info_dict,
                 )
 
+
                 # Normalize gripper action [0,1] -> [-1,+1] because the environment expects the latter
                 action = normalize_gripper_action(action, binarize=True)
 
                 img2 = img.copy()
-                # img2 = resize_image(img2, (256, 256))
-                reasoning_img, metadata = make_reasoning_image(info_dict["decoded_tokens"])
-                print(metadata)
-                # draw_gripper(video_image, metadata["gripper"])
-                draw_bboxes(img2, metadata["bboxes"], img_size=(224, 224))
-                # draw_interactive(video_image, model.use_interactive)
-                # img2 = np.concatenate([img2, reasoning_img], axis=1)
 
-                # write to file
+                reasoning_img, metadata = make_reasoning_image(info_dict["decoded_tokens"])
+
+                draw_bboxes(img2, metadata["bboxes"], img_size=(256, 256))
+
+
                 bgr_img = cv2.cvtColor(img2, cv2.COLOR_RGB2BGR)
                 filename = f"/srv/rl2-lab/flash7/rbansal66/embodied-CoT/rollout_images/image_{task_id}_{episode_idx}_{t}.png"
                 cv2.imwrite(filename, bgr_img)

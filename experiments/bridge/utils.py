@@ -382,24 +382,28 @@ def name_to_random_color(name):
 
 
 def draw_bboxes(img, bboxes, img_size=(640, 480)):
+
+    
     for name, bbox in bboxes.items():
         show_name = name
         # show_name = f'{name}; {str(bbox)}'
 
+        bbox_corrected = [
+            (img_size[1] - bbox[1], bbox[0]),
+            (img_size[1] - bbox[3], bbox[2])
+        ]
+
         cv2.rectangle(
             img,
-            resize_pos((bbox[0], bbox[1]), img_size),
-            # (bbox[0], bbox[1]),
-            # (bbox[2], bbox[3]),
-            resize_pos((bbox[2], bbox[3]), img_size),
+            resize_pos(bbox_corrected[0], img_size),
+            resize_pos(bbox_corrected[1], img_size),
             name_to_random_color(name),
             2,
         )
         cv2.putText(
             img,
             show_name,
-            resize_pos((bbox[0], bbox[1] + 6), img_size),
-            # (bbox[0], bbox[1] + 6),
+            resize_pos((bbox_corrected[0][0], bbox_corrected[0][1] + 6), img_size),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
             (255, 255, 255),
