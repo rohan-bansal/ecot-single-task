@@ -22,6 +22,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
+from dataclasses import dataclass, field
 
 import draccus
 import numpy as np
@@ -87,6 +88,8 @@ class GenerateConfig:
     wandb_project: str = "YOUR_WANDB_PROJECT"        # Name of W&B project to log to (use default!)
     wandb_entity: str = "YOUR_WANDB_ENTITY"          # Name of entity to log under
 
+    episode_id: list[int] = field(default_factory=list)                       # Episode ID for evaluating single ckpt parallelly
+
     seed: int = 7                                    # Random Seed (for reproducibility)
 
     # fmt: on
@@ -105,6 +108,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
     # [OpenVLA] Set action un-normalization key
     cfg.unnorm_key = cfg.task_suite_name
 
+    # cfg.unnorm_key = "libero_spatial" # TODO: hacky testing, remove ASAP
+
     # Load model
     model = get_model(cfg)
 
@@ -117,7 +122,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
         assert cfg.unnorm_key in model.norm_stats, f"Action un-norm key {cfg.unnorm_key} not found in VLA `norm_stats`!"
     elif cfg.model_family == "ecot":
 
-        # Try different possible keys for normalization statistics
+        # TODO: remove this lalter, try different possible keys for normalization statistics
         possible_keys = [
             cfg.unnorm_key,  # Original key
             f"{cfg.unnorm_key}_no_noops",  # No-noops version
@@ -193,8 +198,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
     # Start evaluation
     total_episodes, total_successes = 0, 0
     for task_id in tqdm.tqdm(range(num_tasks_in_suite)):
-        # TODO: testing single task
-        if task_id != target_task_id: # 70: # we only train for 'put the chocolate pudding to the right of the plate'
+        # testing single task
+        if task_id != target_task_id:
             continue
         
         # Get task
@@ -208,7 +213,15 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
         # Start episodes
         task_episodes, task_successes = 0, 0
-        for episode_idx in tqdm.tqdm(range(cfg.num_trials_per_task)):
+
+        if cfg.episode_id:
+            episode_id = cfg.episode_id
+            print(f"Evaluating episode ID: {episode_id}")
+        else:
+            episode_id = range(cfg.num_trials_per_task)
+            print(f"Evaluating all episodes")
+
+        for episode_idx in tqdm.tqdm(episode_id):
             print(f"\nTask: {task_description}")
             log_file.write(f"\nTask: {task_description}\n")
 
@@ -245,6 +258,8 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
                 # Get preprocessed image
                 img = get_libero_image(obs, resize_size)
+                # TODO: mirror the image wrt. y-axis
+                img = img[:, ::-1, :]
 
                 # Save preprocessed image for replay video
                 replay_images.append(img)
